@@ -1,0 +1,48 @@
+version: '3'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"  # RabbitMQ messaging port
+      - "15672:15672"  # RabbitMQ management dashboard
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin_password
+
+  flask_api:
+    build: .
+    command: gunicorn --bind 0.0.0.0:5000 run:app
+    volumes:
+      - .:/app
+    ports:
+      - "5000:5000"
+    depends_on:
+      - rabbitmq
+    environment:
+      - DATABASE_URL=postgresql://neondb_owner:npg_cAi0PbZL1lxd@ep-crimson-scene-a1imjgk5-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=admin_password
+      - FLASK_ENV=development
+
+  worker:
+    build: .
+    command: python worker.py
+    volumes:
+      - .:/app
+    depends_on:
+      - rabbitmq
+      - flask_api
+    environment:
+      - DATABASE_URL=postgresql://neondb_owner:npg_cAi0PbZL1lxd@ep-crimson-scene-a1imjgk5-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=admin_password
+
+volumes:
+  rabbitmq_data:

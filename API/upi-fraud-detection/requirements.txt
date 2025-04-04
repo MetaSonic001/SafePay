@@ -1,0 +1,14 @@
+Flask
+Flask-SQLAlchemy
+psycopg2-binary
+pika
+numpy
+pandas
+scikit-learn
+torch
+networkx
+python-dotenv
+opencv-python
+transformers
+pytest
+gunicorn
