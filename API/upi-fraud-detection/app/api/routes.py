@@ -163,40 +163,6 @@ def get_transaction_status(transaction_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@api_bp.route('/risk-details/<transaction_id>', methods=['GET'])
-def get_risk_details(transaction_id):
-    """
-    Get detailed risk analysis results for a transaction.
-    """
-    try:
-        transaction = Transaction.query.get(transaction_id)
-        if not transaction:
-            return jsonify({'error': 'Transaction not found'}), 404
-            
-        if not transaction.processed:
-            return jsonify({
-                'transaction_id': transaction_id,
-                'status': 'pending',
-                'message': 'Transaction is still being processed'
-            }), 202
-            
-        # Get the risk details
-        risk_details = transaction.get_risk_details()
-        
-        response = {
-            'transaction_id': transaction_id,
-            'risk_score': transaction.risk_score,
-            'status': transaction.status,
-            'risk_details': risk_details,
-            'graph_temporal_score': transaction.graph_temporal_score,
-            'content_analysis_score': transaction.content_analysis_score
-        }
-        
-        return jsonify(response), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @api_bp.route('/recent-transactions', methods=['GET'])
 def get_recent_transactions():
     """

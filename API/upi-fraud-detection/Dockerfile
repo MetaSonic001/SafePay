@@ -6,17 +6,19 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install uv using pip
+RUN pip install uv
 
-# Copy the rest of the application
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN uv pip install --system --no-cache -r requirements.txt
+
+# Copy rest of the application
 COPY . .
 
-# Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-# Default command
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "run:app"]
