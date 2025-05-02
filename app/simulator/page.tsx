@@ -7,27 +7,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import QRCodeDisplay from "@/components/qr-code-display"
 import FraudResultDisplay from "@/components/fraud-result-display"
 
-interface SimulationResult {
-  error?: string;
-  fraud_detected?: boolean;
-  score?: number;
-  fraudDetected?: boolean;  // Added to match TransactionResult
-  riskScore?: number;       // Added to match TransactionResult
-  message?: string;         // Added to match TransactionResult
-  [key: string]: any; // For any other properties that might be returned
-}
-
 export default function SimulatorPage() {
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<SimulationResult | null>(null)
-  
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+
   // Form states
   const [amount, setAmount] = useState("1000")
   const [senderID, setSenderID] = useState("user123")
@@ -48,7 +40,8 @@ export default function SimulatorPage() {
   const simulateQRTampering = async () => {
     try {
       setLoading(true)
-      
+      setError(null)
+
       const payload = {
         fraud_type: 'qr_code_tampering',
         sender_id: senderID,
@@ -57,19 +50,24 @@ export default function SimulatorPage() {
         qr_code_data: presetQrTampered,
         txn_metadata: { qr_manipulated: true }
       }
-      
+
       const response = await fetch('/api/simulate-fraud', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to simulate QR tampering');
+      }
+
       const data = await response.json();
       setResult(data);
-      
+
     } catch (error) {
       console.error('Simulation error:', error);
-      setResult({ error: 'Failed to simulate QR tampering' });
+      setError(error.message || 'Failed to simulate QR tampering');
     } finally {
       setLoading(false)
     }
@@ -78,7 +76,8 @@ export default function SimulatorPage() {
   const simulateAccountTakeover = async () => {
     try {
       setLoading(true)
-      
+      setError(null)
+
       const payload = {
         fraud_type: 'account_takeover',
         sender_id: senderID,
@@ -91,19 +90,24 @@ export default function SimulatorPage() {
           login_attempts_24hrs: 7
         }
       }
-      
+
       const response = await fetch('/api/simulate-fraud', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to simulate account takeover');
+      }
+
       const data = await response.json();
       setResult(data);
-      
+
     } catch (error) {
       console.error('Simulation error:', error);
-      setResult({ error: 'Failed to simulate account takeover' });
+      setError(error.message || 'Failed to simulate account takeover');
     } finally {
       setLoading(false)
     }
@@ -112,7 +116,8 @@ export default function SimulatorPage() {
   const simulateFakeUPI = async () => {
     try {
       setLoading(true)
-      
+      setError(null)
+
       const payload = {
         fraud_type: 'fake_upi',
         sender_id: senderID,
@@ -122,19 +127,24 @@ export default function SimulatorPage() {
         txn_metadata: { qr_manipulated: true },
         transaction_metadata: { new_beneficiary: true }
       }
-      
+
       const response = await fetch('/api/simulate-fraud', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to simulate fake UPI');
+      }
+
       const data = await response.json();
       setResult(data);
-      
+
     } catch (error) {
       console.error('Simulation error:', error);
-      setResult({ error: 'Failed to simulate fake UPI' });
+      setError(error.message || 'Failed to simulate fake UPI');
     } finally {
       setLoading(false)
     }
@@ -143,7 +153,8 @@ export default function SimulatorPage() {
   const simulateDeviceSpoofing = async () => {
     try {
       setLoading(true)
-      
+      setError(null)
+
       const payload = {
         fraud_type: 'device_spoofing',
         sender_id: senderID,
@@ -156,19 +167,24 @@ export default function SimulatorPage() {
           login_attempts_24hrs: 3
         }
       }
-      
+
       const response = await fetch('/api/simulate-fraud', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to simulate device spoofing');
+      }
+
       const data = await response.json();
       setResult(data);
-      
+
     } catch (error) {
       console.error('Simulation error:', error);
-      setResult({ error: 'Failed to simulate device spoofing' });
+      setError(error.message || 'Failed to simulate device spoofing');
     } finally {
       setLoading(false)
     }
@@ -187,11 +203,13 @@ export default function SimulatorPage() {
     setLoginAttempts(0)
     setQrPayload(presetQrNormal)
     setResult(null)
+    setError(null)
   }
 
   const handleSubmit = async () => {
     setLoading(true)
-    
+    setError(null)
+
     try {
       // Create transaction payload
       const payload = {
@@ -233,12 +251,17 @@ export default function SimulatorPage() {
         },
         body: JSON.stringify(payload),
       })
-      
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process transaction');
+      }
+
       const data = await response.json()
       setResult(data)
     } catch (error) {
       console.error('Error simulating transaction:', error)
-      setResult({ error: 'Failed to process transaction' })
+      setError(error.message || 'Failed to process transaction')
     } finally {
       setLoading(false)
     }
@@ -255,13 +278,17 @@ export default function SimulatorPage() {
           </Link>
           <h1 className="text-xl font-bold">Transaction Fraud Simulator</h1>
         </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         {result ? (
           <div className="space-y-6">
-            <FraudResultDisplay result={{
-              fraudDetected: result.fraud_detected || result.fraudDetected,
-              riskScore: result.score || result.riskScore,
-              message: result.error || result.message
-            }} />
+            <FraudResultDisplay result={result} />
             <Button onClick={resetForm} className="w-full">Simulate Another Transaction</Button>
           </div>
         ) : (

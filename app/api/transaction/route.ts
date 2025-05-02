@@ -5,7 +5,32 @@ const FLASK_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5
 export async function POST(request: Request) {
   try {
     const data = await request.json();
+    
+    if (!data || Object.keys(data).length === 0) {
+      return NextResponse.json(
+        { error: 'No valid transaction data found' },
+        { status: 400 }
+      );
+    }
 
+    // For demo purposes, we'll simulate the processing
+    // and return a response immediately with fraud analysis
+    
+    // Create a unique transaction ID for tracking
+    const transactionId = `txn-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    // Create a result with risk details based on the submitted data
+    const result = simulateTransactionResult(data, transactionId);
+    
+    return NextResponse.json({
+      transaction_id: transactionId,
+      processed: true,
+      status: result.decision,
+      timestamp: new Date().toISOString(),
+      result: result
+    });
+
+    /* Commented out actual API call that might not work in your environment
     // Forward to Flask API
     const flaskResponse = await fetch(`${FLASK_API_URL}/api/transaction`, {
       method: 'POST',
@@ -22,34 +47,19 @@ export async function POST(request: Request) {
     }
 
     const flaskData = await flaskResponse.json();
-
-    if (flaskData.transaction_id) {
-      // For demo purposes, we'll simulate the processing
-      // and return a response immediately with fraud analysis
-      
-      // Create a result with risk details based on the submitted data
-      const result = simulateTransactionResult(data);
-      
-      return NextResponse.json({
-        transaction_id: flaskData.transaction_id,
-        processed: true,
-        status: result.decision,
-        result: result
-      });
-    }
-
     return NextResponse.json(flaskData);
+    */
   } catch (error) {
     console.error('Error processing transaction:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error: ' + (error instanceof Error ? error.message : String(error)) },
       { status: 500 }
     );
   }
 }
 
 // Helper function to simulate transaction results
-function simulateTransactionResult(transactionData: any) {
+function simulateTransactionResult(transactionData: any, transactionId: string) {
   // Generate risk factors based on the input data
   const qrManipulated = transactionData.txn_metadata?.qr_manipulated || false;
   const deviceChanged = transactionData.device_info?.device_changed || false;
@@ -61,8 +71,8 @@ function simulateTransactionResult(transactionData: any) {
   
   // Calculate risk scores for different components
   const qrRisk = qrManipulated ? 0.8 : 
-                 (transactionData.qr_code_data?.includes('fakehacker@fraud') ? 0.9 : 
-                 (transactionData.qr_code_data?.includes('suspicious') ? 0.7 : 0.1));
+                (transactionData.qr_code_data?.includes('fakehacker@fraud') ? 0.9 : 
+                (transactionData.qr_code_data?.includes('suspicious') ? 0.7 : 0.1));
   
   const deviceRisk = deviceChanged ? 0.6 : 0.1;
   const locationRisk = locationChanged ? 0.5 : 0.1;
@@ -79,7 +89,42 @@ function simulateTransactionResult(transactionData: any) {
     decision = 'review';
   }
   
+  // Create fraud details if severe risk is detected
+  let fraudDetails = null;
+  if (riskScore >= 0.7) {
+    if (qrRisk >= 0.8) {
+      fraudDetails = {
+        type: 'qr_code_tampering',
+        confidence: qrRisk,
+        detection_method: 'payload_analysis',
+        malicious_payload: true,
+        original_merchant: 'legitimatemerchant@bank',
+        fraudulent_endpoint: qrManipulated ? 'fakehacker@fraud' : 'unknown'
+      };
+    } else if ((deviceRisk + locationRisk) / 2 >= 0.5) {
+      fraudDetails = {
+        type: 'account_takeover',
+        confidence: (deviceRisk + locationRisk) / 2,
+        detection_method: 'behavioral_analysis',
+        device_changed: deviceChanged,
+        location_changed: locationChanged,
+        login_attempts: loginAttempts,
+        transaction_velocity: highVelocity ? 'high' : 'normal'
+      };
+    } else if (metadataRisk >= 0.6) {
+      fraudDetails = {
+        type: 'suspicious_activity',
+        confidence: metadataRisk,
+        detection_method: 'metadata_analysis',
+        new_beneficiary: newBeneficiary,
+        link_source: linkSource,
+        login_attempts: loginAttempts
+      };
+    }
+  }
+  
   return {
+    transaction_id: transactionId,
     decision: decision,
     risk_score: riskScore,
     risk_details: {
@@ -104,7 +149,8 @@ function simulateTransactionResult(transactionData: any) {
         graph_temporal_risk: 0.3,
         content_analysis_risk: 0.2
       }
-    }
+    },
+    fraud_details: fraudDetails
   };
 }
 
