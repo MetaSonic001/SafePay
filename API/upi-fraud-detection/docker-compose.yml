@@ -1,6 +1,7 @@
 services:
   rabbitmq:
     image: rabbitmq:3-management
+    container_name: upi-fraud-detection-rabbitmq
     ports:
       - "5672:5672"  # RabbitMQ messaging port
       - "15672:15672"  # RabbitMQ management dashboard
@@ -15,6 +16,7 @@ services:
     command: gunicorn --bind 0.0.0.0:5000 run:app
     volumes:
       - .:/app
+    container_name: upi-fraud-detection-flask_api
     ports:
       - "5000:5000"
     depends_on:
@@ -30,6 +32,7 @@ services:
   worker:
     build: .
     command: python worker.py
+    container_name: upi-fraud-detection-worker
     volumes:
       - .:/app
     depends_on:

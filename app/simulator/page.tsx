@@ -3,23 +3,30 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowLeft, AlertTriangle, ShieldCheck, ArrowRight } from "lucide-react"
+import { ArrowLeft, Loader2 } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
 import QRCodeDisplay from "@/components/qr-code-display"
 import FraudResultDisplay from "@/components/fraud-result-display"
 
-export default function TransactionSimulatorPage() {
+interface SimulationResult {
+  error?: string;
+  fraud_detected?: boolean;
+  score?: number;
+  fraudDetected?: boolean;  // Added to match TransactionResult
+  riskScore?: number;       // Added to match TransactionResult
+  message?: string;         // Added to match TransactionResult
+  [key: string]: any; // For any other properties that might be returned
+}
+
+export default function SimulatorPage() {
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<SimulationResult | null>(null)
   
   // Form states
   const [amount, setAmount] = useState("1000")
@@ -40,45 +47,131 @@ export default function TransactionSimulatorPage() {
 
   const simulateQRTampering = async () => {
     try {
+      setLoading(true)
+      
+      const payload = {
+        fraud_type: 'qr_code_tampering',
+        sender_id: senderID,
+        receiver_id: receiverID,
+        amount: amount,
+        qr_code_data: presetQrTampered,
+        txn_metadata: { qr_manipulated: true }
+      }
+      
       const response = await fetch('/api/simulate-fraud', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fraud_type: 'qr_code_tampering',
-          sender_id: senderID,
-          receiver_id: receiverID,
-          amount: amount
-        })
+        body: JSON.stringify(payload)
       });
       
       const data = await response.json();
       setResult(data);
+      
     } catch (error) {
       console.error('Simulation error:', error);
       setResult({ error: 'Failed to simulate QR tampering' });
+    } finally {
+      setLoading(false)
     }
   }
 
-  const simulateAccountTakeover = () => {
-    setDeviceChanged(true)
-    setLocationChanged(true)
-    setLoginAttempts(7)
-    setHighVelocity(true)
-    setActiveTab("fraud")
+  const simulateAccountTakeover = async () => {
+    try {
+      setLoading(true)
+      
+      const payload = {
+        fraud_type: 'account_takeover',
+        sender_id: senderID,
+        receiver_id: receiverID,
+        amount: amount,
+        device_info: { device_changed: true },
+        location: { changed: true },
+        transaction_metadata: { 
+          high_velocity: true,
+          login_attempts_24hrs: 7
+        }
+      }
+      
+      const response = await fetch('/api/simulate-fraud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      setResult(data);
+      
+    } catch (error) {
+      console.error('Simulation error:', error);
+      setResult({ error: 'Failed to simulate account takeover' });
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const simulateFakeUPI = () => {
-    setQrManipulated(true)
-    setNewBeneficiary(true)
-    setQrPayload("upi://pay?pa=fakepayment@suspicious&pn=QuickPay&am=1000")
-    setActiveTab("qr")
+  const simulateFakeUPI = async () => {
+    try {
+      setLoading(true)
+      
+      const payload = {
+        fraud_type: 'fake_upi',
+        sender_id: senderID,
+        receiver_id: "fakepayee",
+        amount: amount,
+        qr_code_data: "upi://pay?pa=fakepayment@suspicious&pn=QuickPay&am=1000",
+        txn_metadata: { qr_manipulated: true },
+        transaction_metadata: { new_beneficiary: true }
+      }
+      
+      const response = await fetch('/api/simulate-fraud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      setResult(data);
+      
+    } catch (error) {
+      console.error('Simulation error:', error);
+      setResult({ error: 'Failed to simulate fake UPI' });
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const simulateDeviceSpoofing = () => {
-    setDeviceChanged(true)
-    setLinkSource("whatsapp")
-    setLoginAttempts(3)
-    setActiveTab("fraud")
+  const simulateDeviceSpoofing = async () => {
+    try {
+      setLoading(true)
+      
+      const payload = {
+        fraud_type: 'device_spoofing',
+        sender_id: senderID,
+        receiver_id: receiverID,
+        amount: amount,
+        device_info: { device_changed: true },
+        payment_url: "https://example.com/pay/merchant456",
+        transaction_metadata: { 
+          link_source: "whatsapp",
+          login_attempts_24hrs: 3
+        }
+      }
+      
+      const response = await fetch('/api/simulate-fraud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      setResult(data);
+      
+    } catch (error) {
+      console.error('Simulation error:', error);
+      setResult({ error: 'Failed to simulate device spoofing' });
+    } finally {
+      setLoading(false)
+    }
   }
 
   const resetForm = () => {
@@ -102,6 +195,7 @@ export default function TransactionSimulatorPage() {
     try {
       // Create transaction payload
       const payload = {
+        user_id: senderID,
         sender_id: senderID,
         receiver_id: receiverID,
         amount: amount,
@@ -115,8 +209,8 @@ export default function TransactionSimulatorPage() {
         },
         location: {
           changed: locationChanged,
-          current: locationChanged ? "19.076,72.877" : "18.52,73.86", // Mumbai vs Pune
-          last_known: "18.52,73.86" // Pune
+          current: locationChanged ? "19.076,72.877" : "18.52,73.86", 
+          last_known: "18.52,73.86"
         },
         user_agent: "Mozilla/5.0 Mobile Safari/537.36",
         ip_address: "192.168.1.1",
@@ -125,6 +219,9 @@ export default function TransactionSimulatorPage() {
           new_beneficiary: newBeneficiary,
           link_source: linkSource,
           login_attempts_24hrs: loginAttempts
+        },
+        txn_metadata: {
+          qr_manipulated: qrManipulated
         }
       }
 
@@ -158,10 +255,13 @@ export default function TransactionSimulatorPage() {
           </Link>
           <h1 className="text-xl font-bold">Transaction Fraud Simulator</h1>
         </div>
-
         {result ? (
           <div className="space-y-6">
-            <FraudResultDisplay result={result} />
+            <FraudResultDisplay result={{
+              fraudDetected: result.fraud_detected || result.fraudDetected,
+              riskScore: result.score || result.riskScore,
+              message: result.error || result.message
+            }} />
             <Button onClick={resetForm} className="w-full">Simulate Another Transaction</Button>
           </div>
         ) : (
@@ -171,10 +271,22 @@ export default function TransactionSimulatorPage() {
                 <CardTitle className="text-lg">Preset Fraud Scenarios</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <Button onClick={simulateQRTampering} variant="outline" className="h-auto py-2">QR Tampering</Button>
-                <Button onClick={simulateAccountTakeover} variant="outline" className="h-auto py-2">Account Takeover</Button>
-                <Button onClick={simulateFakeUPI} variant="outline" className="h-auto py-2">Fake UPI Fraud</Button>
-                <Button onClick={simulateDeviceSpoofing} variant="outline" className="h-auto py-2">Device Spoofing</Button>
+                <Button onClick={simulateQRTampering} variant="outline" className="h-auto py-2" disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  QR Tampering
+                </Button>
+                <Button onClick={simulateAccountTakeover} variant="outline" className="h-auto py-2" disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Account Takeover
+                </Button>
+                <Button onClick={simulateFakeUPI} variant="outline" className="h-auto py-2" disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Fake UPI Fraud
+                </Button>
+                <Button onClick={simulateDeviceSpoofing} variant="outline" className="h-auto py-2" disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Device Spoofing
+                </Button>
               </CardContent>
             </Card>
 
@@ -347,15 +459,6 @@ export default function TransactionSimulatorPage() {
                     <div className="pt-4 flex justify-center">
                       <QRCodeDisplay value={qrPayload} />
                     </div>
-                    
-                    {qrManipulated && (
-                      <div className="flex items-center space-x-2 mt-4 p-2 bg-amber-50 dark:bg-amber-950 rounded border border-amber-200 dark:border-amber-800">
-                        <AlertTriangle className="h-5 w-5 text-amber-500" />
-                        <p className="text-sm text-amber-800 dark:text-amber-300">
-                          This QR code has been manipulated and may redirect payments to a fraudulent account.
-                        </p>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -366,6 +469,7 @@ export default function TransactionSimulatorPage() {
               className="w-full" 
               disabled={loading}
             >
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               {loading ? "Processing..." : "Simulate Transaction"}
             </Button>
           </div>
