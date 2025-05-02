@@ -8,11 +8,13 @@ export interface TransactionRequest {
     receiver_id: string;
     amount: number;
     payment_url?: string;
-    qr_code_data?: string;
+    qr_code_data?: string; // Or qr_code_payload if renamed everywhere
     device_info?: any;
     location?: { latitude: number; longitude: number };
     user_agent?: string;
     ip_address?: string;
+    simulation_type?: 'phishing_url' | 'qr_code_tampering' | 'network_fraud';
+    is_simulated?: boolean;
   }
   
   export interface TransactionResponse {
