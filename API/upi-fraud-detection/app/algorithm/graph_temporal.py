@@ -93,6 +93,54 @@ class GraphTemporalAnalyzer:
             temporal_details['reason'] = 'No transaction history'
             return temporal_score, temporal_details
         
+        last_hour = timestamp - timedelta(hours=1)
+        last_day = timestamp - timedelta(days=1)
+    
+        # Transactions in last hour/day
+        hour_txns = Transaction.query.filter(
+            Transaction.sender_id == sender_id,
+            Transaction.timestamp >= last_hour,
+            Transaction.timestamp < timestamp
+        ).all()
+    
+        day_txns = Transaction.query.filter(
+            Transaction.sender_id == sender_id,
+            Transaction.timestamp >= last_day,
+            Transaction.timestamp < timestamp
+        ).all()
+    
+        # Calculate velocity metrics
+        hour_count = len(hour_txns)
+        day_count = len(day_txns)
+        hour_volume = sum(tx.amount for tx in hour_txns)
+        day_volume = sum(tx.amount for tx in day_txns)
+    
+        temporal_details['last_hour_count'] = hour_count
+        temporal_details['last_day_count'] = day_count
+        temporal_details['last_hour_volume'] = hour_volume
+        temporal_details['last_day_volume'] = day_volume
+    
+        # Apply velocity rules
+        if hour_count > 5:  # More than 5 transactions in an hour
+            velocity_anomaly = min(0.1 * (hour_count - 5), 0.5)
+            temporal_score += velocity_anomaly
+            temporal_details['high_frequency_hour'] = True
+    
+        if day_count > 20:  # More than 20 transactions in a day
+            velocity_anomaly = min(0.05 * (day_count - 20), 0.4)
+            temporal_score += velocity_anomaly
+            temporal_details['high_frequency_day'] = True
+    
+        # Handle new recipients
+        if transaction_details['history_length'] > 0:
+            receivers = [tx.receiver_id for tx in sender_history]
+            if receiver_id not in receivers:
+                temporal_details['new_recipient'] = True
+                # Increase score for new recipient but reduce if user has more history
+                new_recipient_score = 0.3 - (min(len(sender_history), 20) * 0.01)
+                temporal_score += max(0, new_recipient_score)
+
+        
         # Calculate amount anomaly score
         amounts = [tx.amount for tx in sender_history]
         mean_amount = np.mean(amounts) if amounts else 0
@@ -179,6 +227,16 @@ class GraphTemporalAnalyzer:
             'is_first_transaction': True
         }
         
+        fraud_connections = self._get_fraud_connections(sender_id, receiver_id)
+        graph_details['fraud_connections'] = fraud_connections
+    
+        if fraud_connections > 0:
+            # Increase risk based on number of fraud connections
+            fraud_factor = min(0.1 * fraud_connections, 0.5)
+            graph_score += fraud_factor
+            graph_details['fraud_connections_factor'] = fraud_factor
+
+
         # Check if there's an edge between sender and receiver
         if self.graph.has_edge(sender_id, receiver_id):
             graph_details['is_first_transaction'] = False
@@ -228,6 +286,45 @@ class GraphTemporalAnalyzer:
         graph_score = max(0.0, min(1.0, 0.5 + graph_score))
         
         return graph_score, graph_details
+    
+    def _get_fraud_connections(self, sender_id, receiver_id):
+        """Count connections to accounts involved in fraud"""
+        fraud_count = 0
+        
+        try:
+            # Get 2-hop neighborhood
+            if self.graph.has_node(sender_id):
+                neighbors = list(self.graph.neighbors(sender_id))
+                
+                # For each neighbor, check if they've been involved in fraud
+                for neighbor in neighbors:
+                    # Check if this neighbor has been blocked in transactions
+                    from app.models.transaction import Transaction
+                    
+                    fraud_txns = Transaction.query.filter(
+                        (Transaction.sender_id == neighbor) | (Transaction.receiver_id == neighbor),
+                        Transaction.status == 'blocked',
+                        Transaction.risk_score > 0.8
+                    ).count()
+                    
+                    if fraud_txns > 0:
+                        fraud_count += 1
+            
+            # Also check receiver directly
+            from app.models.transaction import Transaction
+            receiver_fraud = Transaction.query.filter(
+                (Transaction.sender_id == receiver_id) | (Transaction.receiver_id == receiver_id),
+                Transaction.status == 'blocked',
+                Transaction.risk_score > 0.8
+            ).count()
+            
+            if receiver_fraud > 0:
+                fraud_count += 2  # Weight the receiver's fraud history more heavily
+                
+        except Exception as e:
+            logging.error(f"Error analyzing fraud connections: {str(e)}")
+        
+        return fraud_count
     
     def analyze(self, sender_id, receiver_id, amount, timestamp):
         """

@@ -53,6 +53,70 @@ class Transaction(db.Model):
             'simulation_type': self.simulation_type
         }
     
+    @staticmethod
+    def get_velocity_stats(user_id, hours=1):
+        """Get transaction velocity statistics for a user"""
+        from datetime import datetime, timedelta
+        current_time = datetime.utcnow()
+        period_start = current_time - timedelta(hours=hours)
+    
+        # Count transactions in period
+        count = Transaction.query.filter(
+            Transaction.sender_id == user_id,
+            Transaction.timestamp >= period_start
+        ).count()
+    
+        # Sum amounts in period
+        from sqlalchemy import func
+        amount_sum = db.session.query(func.sum(Transaction.amount)).filter(
+            Transaction.sender_id == user_id,
+            Transaction.timestamp >= period_start
+        ).scalar() or 0
+    
+        return {
+            'count': count,
+            'volume': amount_sum,
+            'period_hours': hours
+        }
+
+    @staticmethod
+    def get_network_stats(user_id, degree=2):
+        """Get network statistics for a user"""
+        from datetime import datetime, timedelta
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    
+        # First-degree connections
+        direct_receivers = db.session.query(Transaction.receiver_id).filter(
+            Transaction.sender_id == user_id,
+            Transaction.timestamp >= thirty_days_ago
+        ).distinct().all()
+    
+        direct_receivers = [r[0] for r in direct_receivers]
+    
+        # If we want second-degree connections
+        second_degree = []
+        if degree > 1 and direct_receivers:
+            second_degree = db.session.query(Transaction.receiver_id).filter(
+                Transaction.sender_id.in_(direct_receivers),
+                Transaction.timestamp >= thirty_days_ago
+            ).distinct().all()
+        
+            second_degree = [r[0] for r in second_degree]
+    
+        # Count fraud connections
+        fraud_connections = db.session.query(Transaction).filter(
+            (Transaction.sender_id.in_(direct_receivers + second_degree) | 
+             Transaction.receiver_id.in_(direct_receivers + second_degree)),
+            Transaction.status == 'blocked',
+            Transaction.risk_score > 0.8
+        ).count()
+    
+        return {
+            'direct_connections': len(direct_receivers),
+            'network_size': len(direct_receivers) + len(second_degree),
+            'fraud_connections': fraud_connections
+        }
+    
     def set_risk_details(self, details_dict):
         """Store risk details as JSON string"""
         self.risk_details = json.dumps(details_dict)
@@ -60,3 +124,6 @@ class Transaction(db.Model):
     def get_risk_details(self):
         """Retrieve risk details as dictionary"""
         return json.loads(self.risk_details) if self.risk_details else {}
+    
+    
+    

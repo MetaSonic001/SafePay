@@ -65,6 +65,14 @@ class ContentAnalyzer:
             'suspicious_tld': False
         }
         
+        recent_fraudulent_domains = self._get_recent_fraudulent_domains()
+        for fraud_domain in recent_fraudulent_domains:
+            if self._domain_similarity(domain.lower(), fraud_domain.lower()) > 0.6:
+                risk_score += 0.3
+                risk_details['similar_to_recent_fraud'] = True
+                risk_details['similar_fraud_domain'] = fraud_domain
+                break
+            
         try:
             # Parse the URL
             parsed_url = urlparse(url)
@@ -119,6 +127,33 @@ class ContentAnalyzer:
             risk_details['error'] = str(e)
         
         return risk_score, risk_details
+    
+    def _get_recent_fraudulent_domains(self):
+        """Get domains from recently flagged fraudulent transactions"""
+        try:
+            # Query transactions flagged as fraud in the last 30 days
+            from app.models.transaction import Transaction
+            from datetime import datetime, timedelta
+            
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            recent_fraud_txns = Transaction.query.filter(
+                Transaction.status == 'blocked',
+                Transaction.risk_score >= 0.8,
+                Transaction.timestamp >= thirty_days_ago
+            ).limit(100).all()
+            
+            domains = []
+            for tx in recent_fraud_txns:
+                if tx.txn_metadata:
+                    meta = json.loads(tx.txn_metadata)
+                    if 'payment_url' in meta:
+                        parsed = urlparse(meta['payment_url'])
+                        domains.append(parsed.netloc)
+            
+            return list(set(domains))  # Return unique domains
+        except Exception as e:
+            logging.error(f"Error getting recent fraudulent domains: {str(e)}")
+            return []
     
     def _domain_similarity(self, domain1, domain2):
         """

@@ -12,3 +12,7 @@ opencv-python
 transformers
 pytest
 gunicorn
+river
+
+
+
