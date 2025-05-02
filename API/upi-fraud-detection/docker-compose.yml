@@ -3,6 +3,7 @@ version: '3'
 services:
   rabbitmq:
     image: rabbitmq:3-management
+    container_name: rabbitmq-safe
     ports:
       - "5672:5672"  # RabbitMQ messaging port
       - "15672:15672"  # RabbitMQ management dashboard
@@ -15,6 +16,7 @@ services:
   flask_api:
     build: .
     command: gunicorn --bind 0.0.0.0:5000 run:app
+    container_name: flask_api-safe
     volumes:
       - .:/app
     ports:
@@ -22,27 +24,29 @@ services:
     depends_on:
       - rabbitmq
     environment:
-      - DATABASE_URL=postgresql://neondb_owner:npg_cAi0PbZL1lxd@ep-crimson-scene-a1imjgk5-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=admin
-      - RABBITMQ_PASS=admin_password
-      - FLASK_ENV=development
+      - FLASK_ENV=development  # Set to 'development' for local development
+      - DATABASE_URL=postgresql://neondb_owner:npg_cAi0PbZL1lxd@ep-crimson-scene-a1imjgk5-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require  # PostgreSQL URL
+      - RABBITMQ_HOST=rabbitmq  # RabbitMQ host (service name from Docker Compose)
+      - RABBITMQ_PORT=5672  # Default RabbitMQ port
+      - RABBITMQ_USER=admin  # RabbitMQ username
+      - RABBITMQ_PASS=admin_password  # RabbitMQ password
 
   worker:
     build: .
     command: python worker.py
+    container_name: worker-safe
     volumes:
       - .:/app
     depends_on:
       - rabbitmq
       - flask_api
     environment:
-      - DATABASE_URL=postgresql://neondb_owner:npg_cAi0PbZL1lxd@ep-crimson-scene-a1imjgk5-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=admin
-      - RABBITMQ_PASS=admin_password
+      - FLASK_ENV=development  # Set to 'development' for local development
+      - DATABASE_URL=postgresql://neondb_owner:npg_cAi0PbZL1lxd@ep-crimson-scene-a1imjgk5-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require  # PostgreSQL URL
+      - RABBITMQ_HOST=rabbitmq  # RabbitMQ host (service name from Docker Compose)
+      - RABBITMQ_PORT=5672  # Default RabbitMQ port
+      - RABBITMQ_USER=admin  # RabbitMQ username
+      - RABBITMQ_PASS=admin_password  # RabbitMQ password
 
 volumes:
   rabbitmq_data:

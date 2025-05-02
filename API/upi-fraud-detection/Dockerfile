@@ -8,9 +8,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+# Install uv
+RUN pip install uv
+
+# Copy requirements.txt first so it can be cached
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Create virtual environment (optional but recommended) and use system installation
+RUN uv venv /app/venv
+RUN uv pip install --no-cache-dir --system -r requirements.txt
 
 # Copy the rest of the application
 COPY . .
