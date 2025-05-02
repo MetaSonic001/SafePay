@@ -13,6 +13,7 @@ transformers
 pytest
 gunicorn
 river
+flask-cors
 
 
 
