@@ -94,7 +94,9 @@ export default function SystemStats() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total_transactions.toLocaleString()}</div>
+          <div className="text-2xl font-bold">
+              {stats?.total_transactions?.toLocaleString?.() ?? 'N/A'}
+            </div>
             <p className="text-xs text-muted-foreground">+2.5% from last week</p>
           </CardContent>
         </Card>
@@ -105,9 +107,9 @@ export default function SystemStats() {
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.fraud_detected}</div>
+          <div className="text-2xl font-bold">{stats?.fraud_detected}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.fraud_rate.toFixed(1)}% fraud rate
+              {stats?.fraud_rate ? stats.fraud_rate.toFixed(1) : 'N/A'}% fraud rate
             </p>
           </CardContent>
         </Card>
@@ -118,8 +120,10 @@ export default function SystemStats() {
             <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avg_risk_score.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">
+          <div className="text-2xl font-bold">
+                {stats?.avg_risk_score ? stats.avg_risk_score.toFixed(1) : 'N/A'}
+              </div>
+                          <p className="text-xs text-muted-foreground">
               {stats.avg_risk_score < 30 ? 'Low risk overall' : 'Moderate risk level'}
             </p>
           </CardContent>
