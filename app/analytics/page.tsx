@@ -46,7 +46,7 @@ export default function AnalyticsPage() {
               <p className="text-sm text-gray-500">
                 Custom transaction pattern visualization would go here in production
               </p>
-              <Link href="/simulation">
+              <Link href="/simulator">
                 <Button>Test Fraud Detection</Button>
               </Link>
             </CardContent>
